@@ -2777,13 +2777,33 @@ ZEND_VM_HANDLER(69, ZEND_INIT_NS_FCALL_BY_NAME, ANY, CONST)
 	USE_OPLINE
 	zend_literal *func_name;
 	call_slot *call = EX(call_slots) + opline->result.num;
+	
+	// @auther ngyuki
+	char *is_compound;
+	int is_found; 
 
 	func_name = opline->op2.literal + 1;
 	if (CACHED_PTR(opline->op2.literal->cache_slot)) {
 		call->fbc = CACHED_PTR(opline->op2.literal->cache_slot);
 	} else if (zend_hash_quick_find(EG(function_table), Z_STRVAL(func_name->constant), Z_STRLEN(func_name->constant)+1, func_name->hash_value, (void **) &call->fbc)==FAILURE) {
 		func_name++;
-		if (UNEXPECTED(zend_hash_quick_find(EG(function_table), Z_STRVAL(func_name->constant), Z_STRLEN(func_name->constant)+1, func_name->hash_value, (void **) &call->fbc)==FAILURE)) {
+
+		// @auther ngyuki
+		for (;; func_name++) {
+			is_found = UNEXPECTED(zend_hash_quick_find(EG(function_table), Z_STRVAL(func_name->constant), Z_STRLEN(func_name->constant)+1, func_name->hash_value, (void **) &call->fbc));
+			
+			if (is_found != FAILURE) {
+				break;
+			}
+			
+			is_compound = memchr(Z_STRVAL(func_name->constant), '\\', Z_STRLEN(func_name->constant));
+			
+			if (!is_compound) {
+				break;
+			}
+		}
+		
+		if (is_found == FAILURE) { 
 			SAVE_OPLINE();
 			zend_error_noreturn(E_ERROR, "Call to undefined function %s()", Z_STRVAL_P(opline->op2.zv));
 		} else {
@@ -3266,7 +3286,7 @@ ZEND_VM_HANDLER(64, ZEND_RECV_INIT, ANY, CONST)
 
 	zend_verify_arg_type((zend_function *) EG(active_op_array), arg_num, assignment_value, opline->extended_value TSRMLS_CC);
 	var_ptr = _get_zval_ptr_ptr_cv_BP_VAR_W(execute_data, opline->result.var TSRMLS_CC);
-	zval_ptr_dtor(var_ptr);
+	Z_DELREF_PP(var_ptr);
 	*var_ptr = assignment_value;
 
 	CHECK_EXCEPTION();

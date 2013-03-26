@@ -401,6 +401,43 @@ int zend_add_func_name_literal(zend_op_array *op_array, const zval *zv TSRMLS_DC
 }
 /* }}} */
 
+static void zend_add_ns_func_name_literal_imports(const char *fn_name, int fn_len TSRMLS_DC) /* {{{ */
+{
+	// @auther ngyuki
+	zval **ns;
+	char *lc_name;
+	int lc_len;
+	char *p;
+	zval c;
+	int lc_literal;
+	
+	for (
+		zend_hash_internal_pointer_end(CG(current_import));
+		zend_hash_get_current_data(CG(current_import), (void**)&ns) != FAILURE;
+		zend_hash_move_backwards(CG(current_import))
+	) {
+		lc_len = Z_STRLEN_PP(ns) + 1 + fn_len;
+		p = lc_name = emalloc(lc_len + 1);
+		
+		zend_str_tolower_copy(p, Z_STRVAL_PP(ns), Z_STRLEN_PP(ns));
+		p += Z_STRLEN_PP(ns);
+		
+		*p++ = '\\';
+		
+		zend_str_tolower_copy(p, fn_name, fn_len);
+		p += fn_len;
+		
+		*p = '\0';
+		
+		assert(((p-lc_name) * sizeof(char)) == lc_len);
+		
+		ZVAL_STRINGL(&c, lc_name, lc_len, 0);
+		lc_literal = zend_add_literal(CG(active_op_array), &c TSRMLS_CC);
+		CALCULATE_LITERAL_HASH(lc_literal);
+	}
+}
+/* }}} */ 
+
 int zend_add_ns_func_name_literal(zend_op_array *op_array, const zval *zv TSRMLS_DC) /* {{{ */
 {
 	int ret;
@@ -427,6 +464,12 @@ int zend_add_ns_func_name_literal(zend_op_array *op_array, const zval *zv TSRMLS
 	ns_separator = (const char*)zend_memrchr(Z_STRVAL_P(zv), '\\', Z_STRLEN_P(zv)) + 1;
 	lc_len = Z_STRLEN_P(zv) - (ns_separator - Z_STRVAL_P(zv));
 	lc_name = zend_str_tolower_dup(ns_separator, lc_len);
+	
+	// @auther ngyuki
+	if (Z_LVAL(CG(declarables).ticks) && CG(current_import)) { 
+		zend_add_ns_func_name_literal_imports(lc_name, lc_len TSRMLS_CC);
+	} 
+
 	ZVAL_STRINGL(&c, lc_name, lc_len, 0);
 	lc_literal = zend_add_literal(CG(active_op_array), &c TSRMLS_CC);
 	CALCULATE_LITERAL_HASH(lc_literal);
