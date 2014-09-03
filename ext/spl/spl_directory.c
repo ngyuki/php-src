@@ -377,7 +377,7 @@ static zend_object *spl_filesystem_object_clone(zval *zobject TSRMLS_DC)
 
 void spl_filesystem_info_set_filename(spl_filesystem_object *intern, char *path, size_t len, size_t use_copy TSRMLS_DC) /* {{{ */
 {
-	char *p1, *p2;
+	zend_string* fname;
 	
 	if (intern->file_name) {
 		efree(intern->file_name);
@@ -390,22 +390,15 @@ void spl_filesystem_info_set_filename(spl_filesystem_object *intern, char *path,
 		intern->file_name[intern->file_name_len-1] = 0;
 		intern->file_name_len--;
 	}
-
-	p1 = strrchr(intern->file_name, '/');
-#if defined(PHP_WIN32) || defined(NETWARE)
-	p2 = strrchr(intern->file_name, '\\');
-#else
-	p2 = 0;
-#endif
-	if (p1 || p2) {
-		intern->_path_len = (p1 > p2 ? p1 : p2) - intern->file_name;
-	} else {
-		intern->_path_len = 0;
-	}
 	
 	if (intern->_path) {
 		efree(intern->_path);
 	}
+	
+	fname = php_basename(intern->file_name, intern->file_name_len, NULL, 0 TSRMLS_CC);	
+	intern->_path_len = len - fname->len - 1;
+	zend_string_release(fname);
+	
 	intern->_path = estrndup(path, intern->_path_len);
 } /* }}} */
 
