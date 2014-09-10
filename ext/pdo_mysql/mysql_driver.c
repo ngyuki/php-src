@@ -264,14 +264,19 @@ static long mysql_handle_doer(pdo_dbh_t *dbh, const char *sql, long sql_len TSRM
 		pdo_mysql_error(dbh);
 		PDO_DBG_RETURN(-1);
 	} else {
-		my_ulonglong c = mysql_affected_rows(H->server);
+		my_ulonglong c;
+		MYSQL_RES* result;
+		result = mysql_store_result(H->server);
+		if (result) {
+			mysql_free_result(result);
+		}
+		c = mysql_affected_rows(H->server);
 		if (c == (my_ulonglong) -1) {
 			pdo_mysql_error(dbh);
 			PDO_DBG_RETURN(H->einfo.errcode ? -1 : 0);
 		} else {
 
 			/* MULTI_QUERY support - eat up all unfetched result sets */
-			MYSQL_RES* result;
 			while (mysql_more_results(H->server)) {
 				if (mysql_next_result(H->server)) {
 					PDO_DBG_RETURN(1);
